@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Card Craft</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap');
+canvas {
+  position:fixed;
+  top:0;
+  left:0;
+  width:100vw;
+  height:100vh;
+  touch-action:none;
+}
+
+/* ── サイドバー ── */
+#sidebar {
+  position:fixed;
+  top:0; left:0;
+  width:260px;
+  height:100vh;
+  background:rgba(20,20,30,.92);
+  backdrop-filter:blur(6px);
+  z-index:200;
+  display:flex;
+  flex-direction:column;
+  transform:translateX(-260px);
+  transition:transform .25s ease;
+  border-right:1px solid rgba(255,255,255,.1);
+}
+#sidebar.open { transform:translateX(0); }
+
+#sidebarToggle {
+  position:fixed;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  z-index:201;
+  width:24px;
+  height:48px;
+  background:rgba(20,20,30,.85);
+  border:1px solid rgba(255,255,255,.15);
+  border-left:none;
+  border-radius:0 6px 6px 0;
+  color:#ccc;
+  font-size:13px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:left .25s ease;
+}
+#sidebar.open ~ #sidebarToggle,
+#sidebarToggle.open { left:260px; }
+
+#sidebarTabs {
+  display:flex;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  flex-shrink:0;
+}
+.sb-tab {
+  flex:1;
+  padding:10px 0;
+  text-align:center;
+  font-size:12px;
+  font-weight:bold;
+  color:#888;
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:color .15s, border-color .15s;
+}
+.sb-tab.active { color:#e8b84b; border-bottom-color:#e8b84b; }
+
+#sidebarContent {
+  flex:1;
+  overflow-y:auto;
+  padding:8px;
+  min-height:0;
+}
+
+#sidebarBottom {
+  height:180px;
+  border-top:1px solid rgba(255,255,255,.1);
+  padding:8px;
+  flex-shrink:0;
+  color:#666;
+  font-size:12px;
+  overflow-y:auto;
+}
+* { box-sizing:border-box; margin:0; padding:0;
+    font-family:'Hiragino Maru Gothic ProN','Hiragino Maru Gothic Pro','BIZ UDPGothic','Nunito',sans-serif; }
+body { overflow:hidden; background:#b8e0b2; touch-action:none; }
+canvas { display:block; touch-action:none; }
+
+#ui {
+  position:fixed; top:0; left:0; width:100%; height:52px;
+  background:linear-gradient(180deg,#1a1a2e,#16213e);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 10px; z-index:10;
+  border-bottom:2px solid #e8b84b;
+  box-shadow:0 2px 8px rgba(0,0,0,.5); gap:6px;
+  transition: padding-left .25s ease;
+}
+.ui-zone {
+  display:flex; align-items:center; justify-content:center; gap:4px;
+  font-size:11px; border-radius:6px; padding:4px 8px; height:36px;
+  transition:background .2s,border-color .2s; flex-shrink:0; white-space:nowrap;
+}
+#trashZone {
+  color:#ccc; background:rgba(255,255,255,.07);
+  border:1px dashed rgba(255,255,255,.3); width:40px; height:24px; padding:0; font-size:10px;
+}
+#trashZone.active { background:rgba(255,80,80,.3); border-color:#ff5050; color:#ff9090; }
+
+.ui-zone, #packOverlay h2, #packOverlay button,
+#mealOverlay h2, #mealInfo, #mealConfirmBtn,
+#gameoverOverlay h1, #gameoverOverlay p, #restartBtn,
+#initPackCard, #dayLabel, #toast {
+  font-family:'Hiragino Maru Gothic ProN','Hiragino Maru Gothic Pro','BIZ UDPGothic','Nunito',sans-serif;
+}#packShopsRow {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  z-index: 11;
+  top: 7px;
+  pointer-events: none;
+}
+#packShopsRow > * { pointer-events: auto; }
+
+/* ↓ 追加：エリア切り替え用ラッパーを横並びに */
+#basePackShopArea,
+#uwPackShopArea {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.pack-shop-zone {
+  position: relative;
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:1px; font-size:10px; border-radius:6px;
+  padding:2px 7px;
+  width:72px;
+  height:36px;
+  white-space:nowrap; line-height:1.3;
+  flex-shrink:0;
+}
+.pack-shop-zone .ps-name { font-weight:bold; font-size:11px; font-family:'Hiragino Maru Gothic ProN','BIZ UDPGothic','Nunito',sans-serif; }
+.pack-shop-zone .ps-cost { font-size:9px; opacity:.8; }
+.pack-shop-zone .ps-num  { font-family:'Hiragino Maru Gothic ProN','BIZ UDPGothic','Nunito',sans-serif; }
+.emoji { font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif; }
+
+#packShopA { color:#c8b860; background:rgba(180,150,60,.1); border:1px solid rgba(180,150,60,.4); }
+#packShopA.active { background:rgba(180,150,60,.3); border-color:#c8a830; }
+
+#packShopB { color:#a0d0ff; background:rgba(80,160,255,.1); border:1px solid rgba(80,160,255,.4); }
+#packShopB.active { background:rgba(80,160,255,.3); border-color:#60b0ff; }
+
+#packShopC { color:#a0e8a0; background:rgba(80,200,80,.1); border:1px solid rgba(80,200,80,.4); }
+#packShopC.active { background:rgba(80,200,80,.3); border-color:#60d060; }
+
+#packShopD { color:#80eeff; background:rgba(40,200,230,.12); border:1px solid rgba(40,200,230,.5); }
+#packShopD.active { background:rgba(40,200,230,.35); border-color:#40d8f0; }
+
+#packShopE { color:#d0a0ff; background:rgba(160,80,255,.12); border:1px solid rgba(160,80,255,.5); }
+#packShopE.active { background:rgba(160,80,255,.35); border-color:#b060ff; }
+
+#packShopF { color:#ff9090; background:rgba(220,60,60,.12); border:1px solid rgba(220,60,60,.5); }
+#packShopF.active { background:rgba(220,60,60,.35); border-color:#ff5050; }
+
+#packShopG {
+  color:#e8e8e8;
+  background:rgba(10,10,15,.6);
+  border:1px solid rgba(180,180,200,.4);
+  box-shadow:0 0 6px rgba(150,150,200,.2);
+}
+#packShopG .ps-name {
+  background:linear-gradient(90deg,#d0d0ff,#ffffff,#d0d0ff);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+#packShopG .ps-cost { color:#aaa; -webkit-text-fill-color:#aaa; }
+#packShopG.active { background:rgba(30,30,50,.8); border-color:rgba(200,200,255,.7); box-shadow:0 0 10px rgba(150,150,255,.4); }
+
+#packShopH {
+  color:#ffe080;
+  background:rgba(255,200,0,.1);
+  border:1px solid #ffd700;
+  box-shadow:0 0 6px rgba(255,215,0,.4);
+  animation:legend-glow 2s ease-in-out infinite;
+}
+#packShopH.active { background:rgba(255,200,0,.3); box-shadow:0 0 14px rgba(255,215,0,.7); }
+@keyframes legend-glow {
+  0%,100% { box-shadow:0 0 4px rgba(255,215,0,.3); }
+  50%      { box-shadow:0 0 10px rgba(255,215,0,.7); }
+}
+#uwPackShopA { color:#d8c890; background:rgba(120,100,50,.15); border:1px solid rgba(120,100,50,.5); }
+#uwPackShopA.active { background:rgba(120,100,50,.35); border-color:#d8b850; }
+
+#uwPackShopB { color:#b0a8ff; background:rgba(70,50,150,.15); border:1px solid rgba(70,50,150,.5); }
+#uwPackShopB.active { background:rgba(70,50,150,.35); border-color:#8870ff; }
+
+#uwPackShopC { color:#ff8080; background:rgba(150,40,40,.15); border:1px solid rgba(150,40,40,.5); }
+#uwPackShopC.active { background:rgba(150,40,40,.35); border-color:#ff5050; }
+
+#uwPackShopD {
+  color:#dfb0ff;
+  background:rgba(80,0,120,.2);
+  border:1px solid #c070ff;
+  box-shadow:0 0 6px rgba(192,112,255,.4);
+  animation:uw-legend-glow 2s ease-in-out infinite;
+}
+#uwPackShopD.active { background:rgba(80,0,120,.45); box-shadow:0 0 14px rgba(192,112,255,.7); }
+@keyframes uw-legend-glow {
+  0%,100% { box-shadow:0 0 4px rgba(192,112,255,.3); }
+  50%      { box-shadow:0 0 10px rgba(192,112,255,.7); }
+}
+.ps-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.3);
+  display: none;
+  z-index: 5;
+}
+.ps-badge.red { display: block; background: #ff4444; box-shadow: 0 0 5px rgba(255,68,68,0.6); }
+.ps-badge.blue { display: block; background: #44aaff; box-shadow: 0 0 5px rgba(68,170,255,0.6); }
+
+/* 解放パック（章クリア後） */
+.pack-shop-zone.locked {
+  opacity:.35; pointer-events:none; filter:grayscale(1);
+}
+.pack-shop-zone.unlocked-new {
+  animation:pack-unlock .6s ease;
+}
+@keyframes pack-unlock {
+  0%   { transform:scale(1); }
+  40%  { transform:scale(1.18); }
+  100% { transform:scale(1); }
+}
+
+/* 日数バー */
+#dayBarWrap {
+  position:fixed; top:52px; left:0; width:100%; height:20px;
+  background:rgba(0,0,0,0.05); z-index:9;
+  display: flex; align-items: flex-start; /* バーの上端をUIの下端(52px)に合わせる */
+}
+#dayBar {
+  height:6px; width:0%;
+  background:rgba(240,192,64,0.7); /* 少し視認性を上げたソフトゴールド */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: width 0.1s linear;
+}
+#dayLabel {
+  position:fixed; top:55px; left:50%; transform:translateX(-50%);
+  font-size:11px; color:#ffe; text-shadow:0 1px 3px #000;
+  pointer-events:none; z-index:9; white-space:nowrap; line-height:1; padding-top:1px;
+}
+
+/* 初期パック */
+#initPackCard {
+  position:fixed; bottom:80px; right:16px;
+  width:86px; height:108px;
+  background:linear-gradient(135deg,#2a2a4a,#1a1a3a);
+  border:2px solid #e8b84b; border-radius:10px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  color:#e8b84b; font-size:11px; font-weight:bold;
+  cursor:pointer; z-index:20; box-shadow:0 4px 12px rgba(0,0,0,.5);
+  gap:5px; user-select:none;
+}
+#initPackCard .pi { font-size:30px; }
+#initPackCard sub { font-size:9px; color:#aaa; font-weight:normal; }
+#initPackCard:active { transform:scale(.95); }
+
+/* パック開封 */
+#packOverlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.75); z-index:100;
+  flex-direction:column; align-items:center; justify-content:center; gap:20px;
+}
+#packOverlay.show { display:flex; }
+#packOverlay h2 { color:#e8b84b; font-size:20px; letter-spacing:2px; }
+#packCards { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+.pack-card-preview {
+  width:80px; height:100px; border-radius:8px; overflow:hidden;
+  box-shadow:0 4px 16px rgba(0,0,0,.6);
+  opacity:0; transform:scale(.6); transition:opacity .25s,transform .25s;
+}
+.pack-card-preview.pop { opacity:1; transform:scale(1); }
+.pch { height:24px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; }
+.pcb { flex:1; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; padding:4px; }
+#packCloseBtn {
+  padding:10px 32px; font-size:15px;
+  background:linear-gradient(135deg,#e8b84b,#c49a2a);
+  color:#1a1a1a; border:none; border-radius:8px; font-weight:bold; cursor:pointer;
+}
+
+/* 食事ターン */
+#mealOverlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.8); z-index:200;
+  flex-direction:column; align-items:center; justify-content:center; gap:16px;
+}
+#mealOverlay.show { display:flex; }
+#mealOverlay h2 { color:#f0c040; font-size:20px; letter-spacing:1px; }
+#mealInfo { color:#eee; font-size:13px; text-align:center; line-height:1.8; }
+#mealFoodList {
+  display:flex; gap:10px; flex-wrap:wrap; justify-content:center; max-width:90vw;
+}
+.meal-food-item {
+  width:72px; height:90px; border-radius:7px; overflow:hidden;
+  cursor:pointer; border:2px solid transparent;
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+  transition:border-color .15s,transform .15s; user-select:none;
+}
+.meal-food-item.selected { border-color:#f0c040; transform:scale(1.06); }
+.meal-food-item .mfh { height:22px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold; color:#fff; }
+.meal-food-item .mfb { flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; padding:3px; text-align:center; color:#fff; }
+#mealConfirmBtn {
+  padding:10px 28px; font-size:15px;
+  background:linear-gradient(135deg,#f0c040,#c09020);
+  color:#1a1a1a; border:none; border-radius:8px; font-weight:bold; cursor:pointer;
+}
+
+/* ゲームオーバー */
+#gameoverOverlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.88); z-index:300;
+  flex-direction:column; align-items:center; justify-content:center; gap:20px;
+}
+#gameoverOverlay.show { display:flex; }
+#gameoverOverlay h1 { color:#ff6060; font-size:32px; letter-spacing:3px; }
+#gameoverOverlay p { color:#ccc; font-size:14px; text-align:center; }
+#restartBtn {
+  padding:12px 36px; font-size:16px;
+  background:linear-gradient(135deg,#e8b84b,#c49a2a);
+  color:#1a1a1a; border:none; border-radius:8px; font-weight:bold; cursor:pointer;
+}
+
+/* 戦闘オーバーレイ */
+
+#battleLog p.result-lose { color:#ff6060; font-weight:bold; }
+
+/* 売却フェーズバナー */
+#sellBanner {
+  display:none; position:fixed; top:60px; left:0; width:100%; z-index:15;
+  background:rgba(180,80,0,.92); color:#fff; padding:6px 14px;
+  font-size:12px; font-weight:bold; text-align:center;
+  border-bottom:2px solid #f0a040;
+}
+#sellBanner.show { display:block; }
+
+/* 速度・一時停止ボタン */
+#speedBtns {
+  position:fixed; bottom:16px; right:16px;
+  display:flex; gap:6px; z-index:20;
+}
+.speed-btn {
+  width:40px; height:40px; border-radius:20px;
+  background:rgba(20,20,40,.82); border:1px solid rgba(255,255,255,.3);
+  color:#fff; font-size:14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  user-select:none;
+}
+.speed-btn.active { background:rgba(232,184,75,.6); border-color:#e8b84b; }
+
+/* クエストパネル */
+/* レシピパネル */
+#recipeBtn {
+  position:fixed; bottom:16px; right:72px;
+  width:48px; height:48px; border-radius:24px;
+  background:rgba(20,20,40,.88); border:2px solid #6a9aff;
+  color:#6a9aff; font-size:18px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  z-index:20; user-select:none;
+}
+#recipePanel {
+  display:none; position:fixed; right:0; top:60px;
+  width:260px; max-width:90vw; height:calc(100vh - 60px);
+  background:rgba(16,16,32,.95); border-left:2px solid #6a9aff;
+  z-index:25; overflow-y:auto; padding:12px;
+  flex-direction:column; gap:6px;
+}
+#recipePanel.show { display:flex; }
+#recipePanel h3 { color:#6a9aff; font-size:14px; margin-bottom:6px; }
+.recipe-item {
+  padding:7px 8px; border-radius:6px;
+  background:rgba(255,255,255,.05);
+  font-size:11px; color:#ccc; line-height:1.5;
+}
+.recipe-item .ri-title { font-weight:bold; color:#aac4ff; margin-bottom:2px; }
+.recipe-item .ri-arrow { color:#888; }
+
+#questBtn {
+  position:fixed; bottom:16px; right:16px;
+  width:48px; height:48px; border-radius:24px;
+  background:rgba(20,20,40,.88); border:2px solid #e8b84b;
+  color:#e8b84b; font-size:20px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  z-index:20; user-select:none;
+}
+#questPanel {
+  display:none; position:fixed; right:0; top:60px;
+  width:260px; max-width:90vw; height:calc(100vh - 60px);
+  background:rgba(16,16,32,.95); border-left:2px solid #e8b84b;
+  z-index:25; overflow-y:auto; padding:12px;
+  flex-direction:column; gap:6px;
+}
+#questPanel.show { display:flex; }
+#questPanel h3 { color:#e8b84b; font-size:14px; margin-bottom:6px; }
+.quest-item {
+  display:flex; align-items:flex-start; gap:8px;
+  padding:7px 8px; border-radius:6px;
+  background:rgba(255,255,255,.05);
+  font-size:11px; color:#ccc; line-height:1.4;
+}
+.quest-item.done { color:#888; }
+.quest-item.done .q-check { color:#4caf50; }
+.quest-check { width:16px; flex-shrink:0; font-size:13px; }
+
+#toast {
+  position:fixed; top:68px; left:50%; transform:translateX(-50%);
+  background:rgba(20,20,40,.9); color:#fff; font-size:12px;
+  padding:6px 16px; border-radius:16px; border:1px solid rgba(255,255,255,.15);
+  pointer-events:none; z-index:50; opacity:0; transition:opacity .25s; white-space:nowrap;
+}
+#toast.show { opacity:1; }
+
+/* ── ステータスインジケーター ── */
+#statusRow {
+  display:flex; align-items:center; gap:4px; flex-shrink:0;
+}
+#cardCount {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(200,200,220,.12); border:1px solid rgba(200,200,220,.25);
+  border-radius:5px; padding:2px 7px; min-width:40px; height:36px;
+  white-space:nowrap; line-height:1.3;
+}
+#cardCount .s-lbl { font-size:8px; color:#888; }
+#cardCount .s-val  { font-size:10px; font-weight:bold; color:#ccc; }
+/* 食糧：◯ */
+#foodStatus {
+  width:40px; height:40px; border-radius:50%;
+  background:#c07820; border:2px solid #804a10;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  flex-shrink:0; line-height:1.2; text-align:center;
+  transition:background .3s;
+}
+#foodStatus .s-lbl { font-size:7px; color:#ffe0a0; }
+#foodStatus .s-val  { font-size:9px; font-weight:bold; color:#fff; }
+/* エメラルド：◇ */
+#emeraldStatus {
+  width:36px; height:36px; border-radius:4px; transform:rotate(45deg);
+  background:#4a9880; border:2px solid #2a6050;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  flex-shrink:0; line-height:1.2; text-align:center;
+  margin:0 6px;
+}
+#emeraldStatus > * { transform:rotate(-45deg); }
+#emeraldStatus .s-val { font-size:10px; font-weight:bold; color:#fff; }
+
+/* ── デバッグメニュー ── */
+#debugMenu {
+  display:none; position:fixed; top:60px; right:0;
+  width:280px; max-width:90vw; height:calc(100vh - 60px);
+  background:rgba(10,10,25,.88);
+  backdrop-filter:blur(12px);
+  border-left:2px solid rgba(255,60,60,.5);
+  z-index:500; overflow-y:auto; padding:14px;
+  flex-direction:column; gap:8px;
+  box-shadow:-4px 0 20px rgba(0,0,0,.5);
+}
+#debugMenu.show { display:flex; }
+#debugMenu h3 {
+  color:#ff6060; font-size:14px; margin:0 0 4px;
+  border-bottom:1px solid rgba(255,60,60,.3); padding-bottom:6px;
+  letter-spacing:1px;
+}
+.dbg-section {
+  background:rgba(255,255,255,.04); border-radius:8px;
+  padding:10px; margin-bottom:6px;
+  border:1px solid rgba(255,255,255,.08);
+}
+.dbg-section-title {
+  font-size:11px; font-weight:bold; color:#ff8080;
+  margin-bottom:8px; letter-spacing:.5px;
+}
+.dbg-row {
+  display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;
+}
+.dbg-btn {
+  padding:5px 10px; font-size:10px; font-weight:bold;
+  border:1px solid rgba(255,255,255,.2); border-radius:5px;
+  background:rgba(255,255,255,.08); color:#ddd;
+  cursor:pointer; transition:background .15s, border-color .15s;
+  font-family:inherit; white-space:nowrap;
+}
+.dbg-btn:hover { background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.4); }
+.dbg-btn.active { background:rgba(255,80,80,.3); border-color:#ff6060; color:#ff8080; }
+.dbg-btn.green { border-color:rgba(80,200,80,.4); color:#80e080; }
+.dbg-btn.green:hover { background:rgba(80,200,80,.2); }
+.dbg-btn.gold { border-color:rgba(200,180,60,.4); color:#e8c840; }
+.dbg-btn.gold:hover { background:rgba(200,180,60,.2); }
+.dbg-btn.red { border-color:rgba(255,80,80,.4); color:#ff8080; }
+.dbg-btn.red:hover { background:rgba(255,80,80,.2); }
+.dbg-select {
+  flex:1; padding:5px 6px; font-size:10px;
+  border:1px solid rgba(255,255,255,.2); border-radius:5px;
+  background:rgba(255,255,255,.08); color:#ddd;
+  font-family:inherit; min-width:0;
+}
+.dbg-select option { background:#1a1a2e; color:#ddd; }
+.dbg-indicator {
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  margin-right:4px; vertical-align:middle;
+}
+.dbg-indicator.off { background:#666; }
+.dbg-indicator.on { background:#4cff4c; box-shadow:0 0 6px rgba(76,255,76,.5); }
+
+/* ── レスポンシブ対応 ── */
+@media (max-width: 1024px) {
+  #packShopsRow {
+    gap: 8px !important;
+  }
+  .pack-shop-zone {
+    width: 66px;
+    padding: 2px 4px;
+  }
+  .pack-shop-zone .ps-name {
+    font-size: 10px;
+  }
+}
+/* ── タイトル / メニュー ── */
+#titleScreen, #gameMenu {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 12, 24, 0.88);
+  backdrop-filter: blur(8px);
+}
+#titleScreen.show, #gameMenu.show { display: flex; }
+
+.title-panel, .menu-panel {
+  width: min(420px, 92vw);
+  background: linear-gradient(160deg, rgba(26,26,46,.98), rgba(22,33,62,.98));
+  border: 2px solid rgba(232,184,75,.45);
+  border-radius: 16px;
+  padding: 28px 24px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  text-align: center;
+}
+.title-panel h1 {
+  font-size: 28px;
+  color: #e8b84b;
+  margin-bottom: 6px;
+  letter-spacing: .08em;
+}
+.title-panel .subtitle {
+  color: #aaa;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.title-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(0,0,0,.35);
+  color: #fff;
+  font-size: 14px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+.title-save-info {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 14px;
+  min-height: 16px;
+}
+.title-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.title-btn, .menu-btn {
+  flex: 1;
+  padding: 12px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.08);
+  color: #eee;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.title-btn:hover, .menu-btn:hover {
+  background: rgba(255,255,255,.16);
+  border-color: rgba(255,255,255,.35);
+}
+.title-btn.primary {
+  background: rgba(232,184,75,.22);
+  border-color: rgba(232,184,75,.55);
+  color: #ffe9a8;
+}
+.title-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.title-save-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.title-slot-btn {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(0,0,0,.25);
+  color: #ccc;
+  font-size: 10px;
+  cursor: pointer;
+}
+.title-slot-btn:hover { background: rgba(255,255,255,.1); }
+.title-note {
+  margin-top: 14px;
+  font-size: 10px;
+  color: #666;
+  line-height: 1.5;
+}
+.menu-panel h2 {
+  color: #e8b84b;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.menu-info {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.menu-btn-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#menuBtn {
+  width: 40px;
+  padding: 0;
+  font-size: 16px;
+  cursor: pointer;
+  color: #e8b84b;
+  background: rgba(232,184,75,.12);
+  border: 1px solid rgba(232,184,75,.35);
+}
+
+@media (max-width: 860px) {
+  #ui {
+    justify-content: space-between;
+    gap: 4px;
+  }
+  #packShopsRow {
+    position: static;
+    transform: none;
+    flex: 1;
+    overflow-x: auto;
+    pointer-events: auto;
+    gap: 6px !important;
+    scrollbar-width: none; /* Firefox */
+    padding: 0 4px;
+  }
+  #packShopsRow::-webkit-scrollbar {
+    display: none; /* Safari / Chrome */
+  }
+  .pack-shop-zone {
+    width: 60px;
+    padding: 2px 2px;
+  }
+  .pack-shop-zone .ps-name {
+    font-size: 9px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="titleScreen" class="show">
+  <div class="title-panel">
+    <h1>Card Craft</h1>
+    <div class="subtitle">カードで村を育てる冒険</div>
+    <input type="text" id="titlePlayerName" class="title-input" maxlength="16" placeholder="プレイヤー名（16文字まで）" />
+    <div id="titleSaveInfo" class="title-save-info"></div>
+    <div class="title-btn-row">
+      <button id="titleContinueBtn" class="title-btn primary">つづきから</button>
+      <button id="titleNewBtn" class="title-btn">はじめから</button>
+    </div>
+    <div id="titleSaveList" class="title-save-list"></div>
+    <div class="title-note">セーブデータはこのブラウザに保存されます。<br>友達と別のPC・ブラウザではデータは共有されません。</div>
+  </div>
+</div>
+
+<div id="gameMenu">
+  <div class="menu-panel">
+    <h2>メニュー</h2>
+    <div class="menu-info">
+      <div>プレイヤー：<span id="menuPlayerName"></span></div>
+      <div id="menuDayInfo"></div>
+    </div>
+    <div class="menu-btn-row">
+      <button id="menuResumeBtn" class="menu-btn">ゲームに戻る</button>
+      <button id="menuSaveBtn" class="menu-btn">セーブ</button>
+      <button id="menuTitleBtn" class="menu-btn">タイトルへ</button>
+    </div>
+  </div>
+</div>
+
+<div id="ui" style="display:none;">
+  <div class="ui-zone" id="menuBtn" title="メニュー">☰</div>
+  <div class="ui-zone" id="trashZone">売却</div>
+  <div id="packShopsRow" style="gap:16px;">
+    <div id="basePackShopArea">
+      <div class="pack-shop-zone" id="packShopA">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopA-name">始まりの書</span><span class="ps-cost" id="packShopA-cost"><span class="emoji">💎</span><span class="ps-num">×3</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopB">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopB-name">知識の書</span><span class="ps-cost" id="packShopB-cost"><span class="emoji">💎</span><span class="ps-num">×4</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopC">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopC-name">栽培の書</span><span class="ps-cost" id="packShopC-cost"><span class="emoji">💎</span><span class="ps-num">×10</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopD">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopD-name">珍味の書</span><span class="ps-cost" id="packShopD-cost"><span class="emoji">💎</span><span class="ps-num">×10</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopE">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopE-name">知恵の書</span><span class="ps-cost" id="packShopE-cost"><span class="emoji">💎</span><span class="ps-num">×15</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopF">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopF-name">闘いの書</span><span class="ps-cost" id="packShopF-cost"><span class="emoji">💎</span><span class="ps-num">×15</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopG">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopG-name">探索の書</span><span class="ps-cost" id="packShopG-cost"><span class="emoji">💎</span><span class="ps-num">×20</span></span>
+      </div>
+      <div class="pack-shop-zone" id="packShopH">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="packShopH-name">叡智の書</span><span class="ps-cost" id="packShopH-cost"><span class="emoji">💎</span><span class="ps-num">×25</span></span>
+      </div>
+    </div>
+    <div id="uwPackShopArea" style="display: none;">
+      <div class="pack-shop-zone" id="uwPackShopA">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="uwPackShopA-name">迷魂の書</span><span class="ps-cost" id="uwPackShopA-cost"><span class="emoji">💎</span><span class="ps-num">×4</span></span>
+      </div>
+      <div class="pack-shop-zone" id="uwPackShopB">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="uwPackShopB-name">冥途の書</span><span class="ps-cost" id="uwPackShopB-cost"><span class="emoji">💎</span><span class="ps-num">×10</span></span>
+      </div>
+      <div class="pack-shop-zone" id="uwPackShopC">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="uwPackShopC-name">戦骸の書</span><span class="ps-cost" id="uwPackShopC-cost"><span class="emoji">💎</span><span class="ps-num">×15</span></span>
+      </div>
+      <div class="pack-shop-zone" id="uwPackShopD">
+        <div class="ps-badge"></div>
+        <span class="ps-name" id="uwPackShopD-name">深淵の書</span><span class="ps-cost" id="uwPackShopD-cost"><span class="emoji">💎</span><span class="ps-num">×20</span></span>
+      </div>
+    </div>
+  </div>
+  <div id="statusRow" style="z-index:12; position:relative;">
+    <div id="cardCount">
+      <span class="s-val" id="cardCountVal">0/20</span>
+    </div>
+    <div id="foodStatus">
+      <span class="s-val" id="foodStatusVal">0/0</span>
+    </div>
+    <div id="emeraldStatus">
+      <span class="s-val" id="emeraldStatusVal">0</span>
+    </div>
+  </div>
+</div>
+
+<div id="dayBarWrap" style="display:none;"><div id="dayBar"></div></div>
+<div id="dayLabel" style="display:none;">0日目</div>
+
+<!-- サイドバー -->
+<div id="sidebar" style="display:none;">
+  <div id="sidebarTabs">
+    <div class="sb-tab active" id="sbTabQuest">📋 クエスト</div>
+    <div class="sb-tab" id="sbTabRecipe">📖 レシピ</div>
+  </div>
+  <div id="sidebarContent">
+    <!-- クエストコンテンツ -->
+    <div id="sbQuestContent"></div>
+    <!-- レシピコンテンツ -->
+    <div id="sbRecipeToolbar" style="display:none;margin-bottom:8px;">
+      <input type="text" id="sbRecipeSearch" placeholder="🔍 生成物・分類名で検索..." style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.25);color:#fff;font-size:11px;box-sizing:border-box;" />
+    </div>
+    <div id="sbRecipeContent" style="display:none;"></div>
+  </div>
+  <div id="sidebarBottom">
+    <div style="color:#555;font-size:11px;">カードの説明</div>
+    <div id="cardDescription" style="margin-top:4px;color:#888;font-size:12px;">カードを選択すると説明が表示されます</div>
+  </div>
+</div>
+<button id="sidebarToggle" style="display:none;">＞</button>
+
+<canvas id="game"></canvas>
+
+
+
+<div id="packOverlay">
+  <h2>パック開封！</h2>
+  <div id="packCards"></div>
+  <button id="packCloseBtn">盤面に追加</button>
+</div>
+
+<div id="mealOverlay">
+  <h2>🍽 食事の時間</h2>
+  <div id="mealInfo"></div>
+  <div id="mealFoodList"></div>
+  <button id="mealConfirmBtn">確定</button>
+</div>
+
+<div id="sellBanner">
+  📦 カード超過！ <span id="sellBannerText"></span>
+</div>
+
+<div id="speedBtns" style="display:none;">
+  <div class="speed-btn" id="btnPause" title="一時停止">⏸</div>
+  <div class="speed-btn active" id="btn1x" title="1倍速">×1</div>
+  <div class="speed-btn" id="btn3x" title="3倍速">×3</div>
+</div>
+
+<div id="gameoverOverlay">
+  <h1>GAME OVER</h1>
+  <p id="gameoverMsg"></p>
+  <button id="restartBtn">タイトルへ</button>
+</div>
+
+<div id="toast"></div>
+
+<!-- デバッグメニュー -->
+<div id="debugMenu">
+  <h3>🔧 DEBUG MODE</h3>
+
+  <!-- カード生成 -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">📦 カード生成</div>
+    <div class="dbg-row" style="margin-bottom: 6px;">
+      <input type="text" id="dbgCardSearch" placeholder="🔍 カード名・IDで検索..." style="width: 100%; padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.3); color: #fff; font-size: 11px; box-sizing: border-box;" />
+    </div>
+    <div class="dbg-row">
+      <select id="dbgCardSelect" class="dbg-select" style="flex: 1; min-width: 0;"></select>
+      <button class="dbg-btn green" id="dbgSpawnCard" style="margin-left: 8px;">生成</button>
+    </div>
+  </div>
+
+  <!-- エメラルド -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">💎 エメラルド操作</div>
+    <div class="dbg-row">
+      <button class="dbg-btn gold" id="dbgEm100">+100</button>
+      <button class="dbg-btn gold" id="dbgEm1000">+1000</button>
+      <button class="dbg-btn red" id="dbgEmReset">リセット</button>
+    </div>
+  </div>
+
+  <!-- 時間 -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">⏱ 時間・日数操作</div>
+    <div class="dbg-row">
+      <button class="dbg-btn" id="dbgFreezeTime"><span class="dbg-indicator off" id="dbgFreezeInd"></span>時間停止</button>
+      <button class="dbg-btn" id="dbgSpeed10x"><span class="dbg-indicator off" id="dbgSpeed10xInd"></span>10倍速</button>
+      <button class="dbg-btn red" id="dbgSkipNight">夜に進める</button>
+    </div>
+  </div>
+
+  <!-- プレイヤー -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">🛡 プレイヤー設定</div>
+    <div class="dbg-row">
+      <button class="dbg-btn" id="dbgGodMode"><span class="dbg-indicator off" id="dbgGodInd"></span>無敵モード</button>
+      <button class="dbg-btn green" id="dbgHealAll">全員全回復</button>
+    </div>
+    <div class="dbg-row">
+      <button class="dbg-btn" id="dbgNoMealCost"><span class="dbg-indicator off" id="dbgNoMealCostInd"></span>必要満腹度0</button>
+      <button class="dbg-btn" id="dbgNoGameOver"><span class="dbg-indicator off" id="dbgNoGameOverInd"></span>ゲームオーバー無効</button>
+    </div>
+  </div>
+
+  <!-- モブ設定 -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">👾 モブ設定</div>
+    <div class="dbg-row">
+      <button class="dbg-btn" id="dbgFreezeMobs"><span class="dbg-indicator off" id="dbgFreezeMobsInd"></span>モブ移動制限</button>
+    </div>
+  </div>
+
+  <!-- クエスト & レシピ -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">📋 クエスト & レシピ</div>
+    <div class="dbg-row">
+      <button class="dbg-btn gold" id="dbgCompleteQuests">全クエストクリア</button>
+    </div>
+    <div class="dbg-row">
+      <button class="dbg-btn gold" id="dbgUnlockRecipes">全レシピ/図鑑解放</button>
+    </div>
+  </div>
+
+  <!-- 盤面整理 -->
+  <div class="dbg-section">
+    <div class="dbg-section-title">🗑 盤面整理</div>
+    <div class="dbg-row">
+      <button class="dbg-btn red" id="dbgClearHostiles">敵モブを消去</button>
+      <button class="dbg-btn red" id="dbgClearNonHuman">村人以外を消去</button>
+      <button class="dbg-btn red" id="dbgClearAll">全カード消去</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/defs.js"></script>
+<script src="js/game.js"></script>
+<script src="js/save.js"></script>
+
+</body>
+</html>
